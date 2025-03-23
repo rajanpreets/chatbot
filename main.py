@@ -32,13 +32,17 @@ SUPPORTED_MODELS = [
 class DrugRequest(BaseModel):
     drugs: List[str]
 
+class NewsItem(BaseModel):
+    summary: str
+    url: str
+
 class DrugAnalysisResponse(BaseModel):
     molecule: str
     latest_summary: str
     moa: str
-    regulatory_news: str
-    clinical_news: str
-    commercial_news: str
+    regulatory_news: List[NewsItem]
+    clinical_news: List[NewsItem]
+    commercial_news: List[NewsItem]
 
 def get_visible_text(url: str) -> str:
     try:
@@ -148,12 +152,16 @@ async def analyze_drugs(request: DrugRequest):
                     summaries.append(news_summary)
                     
                     category = categorize_news(news_summary)
+                    news_item = {
+                        "summary": news_summary,
+                        "url": link
+                    }
                     if category == 'Clinical':
-                        clinical.append(news_summary)
+                        clinical.append(news_item)
                     elif category == 'Regulatory':
-                        regulatory.append(news_summary)
+                        regulatory.append(news_item)
                     elif category == 'Commercial':
-                        commercial.append(news_summary)
+                        commercial.append(news_item)
 
             moa = extract_moa(drug, summaries) if summaries else "MoA not available"
             
@@ -161,9 +169,9 @@ async def analyze_drugs(request: DrugRequest):
                 "molecule": drug,
                 "latest_summary": latest_summary,
                 "moa": moa,
-                "regulatory_news": "\n\n".join(regulatory) or "No regulatory news",
-                "clinical_news": "\n\n".join(clinical) or "No clinical news",
-                "commercial_news": "\n\n".join(commercial) or "No commercial news"
+                "regulatory_news": regulatory,
+                "clinical_news": clinical,
+                "commercial_news": commercial
             })
         
         return all_data
