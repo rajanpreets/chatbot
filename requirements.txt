@@ -1,2 +1,16 @@
-streamlit
+beautifulsoup4==4.13.3
+google_search_results==2.4.2
+groq
+pandas==2.2.3
+pydantic==2.10.6
+Requests==2.32.3
+streamlit==1.43.2
+fastapi>=0.68.0
+uvicorn>=0.15.0
+requests>=2.26.0
+beautifulsoup4>=4.9.3
+serpapi
+langchain-groq
 openai
+python-dotenv
+pydantic
