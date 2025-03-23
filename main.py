@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
 from serpapi import GoogleSearch
-from groq import Groq  # Changed import
+from groq import Groq
 import os
 from typing import List, Dict
 
@@ -19,10 +19,9 @@ app.add_middleware(
 )
 
 # Initialize Groq client
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))  # Changed client initialization
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
 
-# Available Groq models (choose one)
 SUPPORTED_MODELS = [
     "mixtral-8x7b-32768",
     "llama3-70b-8192",
@@ -57,7 +56,7 @@ def summarize_content(text: str, prompt: str) -> str:
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": text}
             ],
-            model=SUPPORTED_MODELS[1],  # Using llama3-70b-8192
+            model=SUPPORTED_MODELS[1],
             temperature=0.1,
             max_tokens=1024
         )
@@ -65,12 +64,112 @@ def summarize_content(text: str, prompt: str) -> str:
     except Exception as e:
         return f"Error summarizing content: {e}"
 
-# Rest of the functions remain the same as original...
+def get_latest_summary(drug: str) -> str:
+    try:
+        params = {
+            "api_key": SERPAPI_API_KEY,
+            "engine": "google",
+            "q": f"{drug} latest drug developments 2024",
+            "google_domain": "google.com",
+            "gl": "us",
+            "hl": "en",
+            "num": 1
+        }
+        
+        search = GoogleSearch(params)
+        results = search.get_dict()
+        organic_results = results.get('organic_results', [])
+        
+        if not organic_results:
+            return "No recent information found"
+            
+        top_result = organic_results[0]
+        link = top_result.get('link')
+        text = get_visible_text(link)
+        
+        if "Error" in text:
+            return "Information unavailable - could not fetch source"
+            
+        return summarize_content(
+            text, 
+            "Extract the most recent and important information about this drug in 3 bullet points. Focus on updates from the last 12 months."
+        )
+        
+    except Exception as e:
+        return f"Error retrieving summary: {str(e)}"
+
+def categorize_news(summary: str) -> str:
+    return summarize_content(
+        summary,
+        "Classify this news into ONLY ONE of these categories: Clinical, Regulatory, Commercial. Respond only with the category name."
+    )
+
+def extract_moa(drug_name: str, summaries: List[str]) -> str:
+    return summarize_content(
+        "\n".join(summaries),
+        f"Identify the mechanism of action for {drug_name} from these news summaries. Respond concisely in one sentence."
+    )
 
 @app.post("/analyze", response_model=List[DrugAnalysisResponse])
 async def analyze_drugs(request: DrugRequest):
-    # Implementation remains the same...
-    # (Only the OpenAI calls were replaced in summarize_content)
+    try:
+        all_data = []
+        
+        for drug in request.drugs:
+            clinical, regulatory, commercial = [], [], []
+            summaries = []
+            
+            latest_summary = get_latest_summary(drug)
+            
+            news_params = {
+                "api_key": SERPAPI_API_KEY,
+                "engine": "google",
+                "q": f"{drug} pharmaceutical news",
+                "google_domain": "google.com",
+                "gl": "us",
+                "hl": "en",
+                "tbm": "nws",
+                "tbs": "qdr:m",
+                "num": 5
+            }
+            
+            news_search = GoogleSearch(news_params)
+            news_results = news_search.get_dict().get('news_results', [])
+            
+            for item in news_results[:5]:
+                link = item.get('link')
+                news_text = get_visible_text(link)
+                
+                if "Error" not in news_text:
+                    news_summary = summarize_content(
+                        news_text,
+                        "Summarize this pharmaceutical news in 3 bullet points focusing on drug development aspects."
+                    )
+                    summaries.append(news_summary)
+                    
+                    category = categorize_news(news_summary)
+                    if category == 'Clinical':
+                        clinical.append(news_summary)
+                    elif category == 'Regulatory':
+                        regulatory.append(news_summary)
+                    elif category == 'Commercial':
+                        commercial.append(news_summary)
+
+            moa = extract_moa(drug, summaries) if summaries else "MoA not available"
+            
+            all_data.append({
+                "molecule": drug,
+                "latest_summary": latest_summary,
+                "moa": moa,
+                "regulatory_news": "\n\n".join(regulatory) or "No regulatory news",
+                "clinical_news": "\n\n".join(clinical) or "No clinical news",
+                "commercial_news": "\n\n".join(commercial) or "No commercial news"
+            })
+        
+        return all_data
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
