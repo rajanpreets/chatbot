@@ -12,7 +12,10 @@ import {
   Paper,
   Alert,
   Link,
-  Chip
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import MedicalInformationIcon from '@mui/icons-material/MedicalInformation';
@@ -23,6 +26,7 @@ const App = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Regulatory');
 
   const analyzeDrugs = async () => {
     if (!drugs.trim()) {
@@ -142,22 +146,44 @@ const App = () => {
                 }}>
                   News Analysis
                 </Typography>
+                
+                <FormControl fullWidth sx={{ mb: 3, mt: 2 }}>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    value={selectedCategory}
+                    label="Category"
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    sx={{
+                      '& .MuiSelect-select': {
+                        padding: '12px 32px 12px 14px'
+                      }
+                    }}
+                  >
+                    <MenuItem value="Regulatory">Regulatory Updates</MenuItem>
+                    <MenuItem value="Clinical">Clinical Developments</MenuItem>
+                    <MenuItem value="Commercial">Commercial Activity</MenuItem>
+                  </Select>
+                </FormControl>
+
                 <Grid container spacing={3}>
-                  <CategorySection 
-                    title="Regulatory Updates" 
-                    items={drugData.regulatory_news}
-                    color="#0066cc"
-                  />
-                  <CategorySection
-                    title="Clinical Developments"
-                    items={drugData.clinical_news}
-                    color="#cc0000"
-                  />
-                  <CategorySection
-                    title="Commercial Activity"
-                    items={drugData.commercial_news}
-                    color="#009933"
-                  />
+                  {selectedCategory === 'Regulatory' && (
+                    <CategorySection
+                      items={drugData.regulatory_news}
+                      color="#0066cc"
+                    />
+                  )}
+                  {selectedCategory === 'Clinical' && (
+                    <CategorySection
+                      items={drugData.clinical_news}
+                      color="#cc0000"
+                    />
+                  )}
+                  {selectedCategory === 'Commercial' && (
+                    <CategorySection
+                      items={drugData.commercial_news}
+                      color="#009933"
+                    />
+                  )}
                 </Grid>
               </Grid>
             </Grid>
@@ -192,24 +218,15 @@ const Section = ({ title, content }) => (
   </Paper>
 );
 
-const CategorySection = ({ title, items, color }) => (
-  <Grid item xs={12} md={4}>
+const CategorySection = ({ items, color }) => (
+  <Grid item xs={12}>
     <Paper sx={{ 
       p: 2, 
-      height: '100%', 
       backgroundColor: '#ffffff',
       border: `1px solid ${color}30`,
       borderRadius: '8px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
     }}>
-      <Typography variant="subtitle1" gutterBottom sx={{ 
-        fontWeight: 600, 
-        color: color,
-        fontFamily: 'Roboto Condensed',
-        mb: 2
-      }}>
-        {title}
-      </Typography>
       {items.map((item, index) => (
         <Paper key={index} elevation={0} sx={{ 
           mb: 2, 
